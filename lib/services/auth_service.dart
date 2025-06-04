@@ -1,39 +1,50 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   User? get currentUser => _auth.currentUser;
+
   Stream<User?> get authStateChanges => _auth.authStateChanges();
-  Future<User?> signInWithEmailPassword(String email, String password) async {
+
+   Future<String?> loginUser({
+    required String username,
+    required String password,
+    
+  }) async {
+   
     try {
-      final credential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
+      final response = await http.post(
+        Uri.parse('https://fakestoreapi.com/auth/login'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'username': 'derek',
+          'password': 'jklg*_56',
+        }),
       );
-      return credential.user;
-    } on FirebaseAuthException catch (e) {
-      switch (e.code) {
-        case 'user-not-found':
-          throw Exception('No se encontró ningún usuario con ese email');
-        case 'wrong-password':
-          throw Exception('Contraseña incorrecta');
-        case 'invalid-email':
-          throw Exception('El formato del email no es válido');
-        case 'user-disabled':
-          throw Exception('Esta cuenta ha sido deshabilitada');
-        case 'too-many-requests':
-          throw Exception('Demasiados intentos fallidos. Intenta más tarde');
-        case 'invalid-credential':
-          throw Exception('Las credenciales no son válidas');
-        default:
-          throw Exception('Error de autenticación: ${e.message}');
+
+      print('Login response status: ${response.statusCode}');
+      print('Login response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        // La API devuelve un objeto con el token
+        return responseData['token'] as String?;
+      } else {
+        throw Exception('Error en el login: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error inesperado: $e');
+      print('Error en loginUser: $e');
+      return null;
     }
   }
+
   Future<User?> signUpWithEmailPassword(String email, String password) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(

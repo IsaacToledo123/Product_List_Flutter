@@ -8,9 +8,15 @@ import 'cart_screen.dart';
 import '../models/navItem.dart';
 
 class HomeScreen extends StatefulWidget {
-  final User user;
+  final User? user; // Ahora es opcional
+  final String? username; // Para usuarios fake
+  final String? email; // Para usuarios fake
 
-  HomeScreen({required this.user});
+  HomeScreen({
+    this.user, 
+    this.username, 
+    this.email,
+  });
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
@@ -39,6 +45,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       color: Color(0xFFE17055),
     ),
   ];
+
+  // Propiedades para obtener información del usuario
+  bool get isFakeUser => widget.user == null;
+  String get userEmail => widget.user?.email ?? widget.email ?? 'Sin email';
+  String get userInitial {
+    if (widget.user?.email != null) {
+      return widget.user!.email!.substring(0, 1).toUpperCase();
+    } else if (widget.username != null) {
+      return widget.username!.substring(0, 1).toUpperCase();
+    }
+    return 'U';
+  }
+  bool get isEmailVerified => widget.user?.emailVerified ?? true; // Fake users siempre verificados
 
   @override
   void initState() {
@@ -98,7 +117,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     if (result == true) {
       try {
-        await _authService.signOut();
+        // Solo hacer sign out de Firebase si no es usuario fake
+        if (!isFakeUser) {
+          await _authService.signOut();
+        }
+        
         Navigator.of(context).pushAndRemoveUntil(
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) => LoginScreen(),
@@ -133,7 +156,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => _UserProfileBottomSheet(user: widget.user),
+      builder: (context) => _UserProfileBottomSheet(
+        user: widget.user,
+        username: widget.username,
+        email: widget.email,
+      ),
     );
   }
 
@@ -187,13 +214,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [Color(0xFF6C5CE7), Color(0xFFA29BFE)],
+                      colors: isFakeUser 
+                          ? [Color(0xFF00B894), Color(0xFF55EFC4)] // Verde para usuario fake
+                          : [Color(0xFF6C5CE7), Color(0xFFA29BFE)], // Morado para Firebase
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0xFF6C5CE7).withOpacity(0.3),
+                        color: (isFakeUser ? Color(0xFF00B894) : Color(0xFF6C5CE7)).withOpacity(0.3),
                         blurRadius: 12,
                         offset: Offset(0, 4),
                       ),
@@ -201,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                   child: Center(
                     child: Text(
-                      widget.user.email?.substring(0, 1).toUpperCase() ?? 'U',
+                      userInitial,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -273,7 +302,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 }
-
 
 class _SignOutBottomSheet extends StatelessWidget {
   @override
@@ -382,9 +410,26 @@ class _SignOutBottomSheet extends StatelessWidget {
 }
 
 class _UserProfileBottomSheet extends StatelessWidget {
-  final User user;
+  final User? user;
+  final String? username;
+  final String? email;
 
-  _UserProfileBottomSheet({required this.user});
+  _UserProfileBottomSheet({
+    this.user,
+    this.username,
+    this.email,
+  });
+
+  bool get isFakeUser => user == null;
+  String get displayEmail => user?.email ?? email ?? 'Sin email';
+  String get displayInitial {
+    if (user?.email != null) {
+      return user!.email!.substring(0, 1).toUpperCase();
+    } else if (username != null) {
+      return username!.substring(0, 1).toUpperCase();
+    }
+    return 'U';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +456,9 @@ class _UserProfileBottomSheet extends StatelessWidget {
             height: 80,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF6C5CE7), Color(0xFFA29BFE)],
+                colors: isFakeUser 
+                    ? [Color(0xFF00B894), Color(0xFF55EFC4)] // Verde para usuario fake
+                    : [Color(0xFF6C5CE7), Color(0xFFA29BFE)], // Morado para Firebase
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -419,7 +466,7 @@ class _UserProfileBottomSheet extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                user.email?.substring(0, 1).toUpperCase() ?? 'U',
+                displayInitial,
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 32,
@@ -437,23 +484,46 @@ class _UserProfileBottomSheet extends StatelessWidget {
               color: Color(0xFF2D3436),
             ),
           ),
+          if (isFakeUser)
+            Container(
+              margin: EdgeInsets.only(top: 8),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Color(0xFF00B894).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Usuario Demo',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF00B894),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           SizedBox(height: 24),
           _buildProfileItem(
             icon: Icons.email_outlined,
             title: 'Email',
-            subtitle: user.email ?? 'Sin email',
+            subtitle: displayEmail,
           ),
+          if (username != null)
+            _buildProfileItem(
+              icon: Icons.person_outline,
+              title: 'Username',
+              subtitle: username!,
+            ),
           _buildProfileItem(
-            icon: user.emailVerified ? Icons.verified : Icons.warning_outlined,
+            icon: (user?.emailVerified ?? true) ? Icons.verified : Icons.warning_outlined,
             title: 'Estado',
-            subtitle: user.emailVerified ? 'Verificado' : 'No verificado',
-            subtitleColor: user.emailVerified ? Color(0xFF00B894) : Color(0xFFE17055),
+            subtitle: (user?.emailVerified ?? true) ? 'Verificado' : 'No verificado',
+            subtitleColor: (user?.emailVerified ?? true) ? Color(0xFF00B894) : Color(0xFFE17055),
           ),
-          if (user.displayName != null)
+          if (user?.displayName != null)
             _buildProfileItem(
               icon: Icons.person_outline,
               title: 'Nombre',
-              subtitle: user.displayName!,
+              subtitle: user!.displayName!,
             ),
           SizedBox(height: 20),
           TextButton(
@@ -464,7 +534,7 @@ class _UserProfileBottomSheet extends StatelessWidget {
             child: Text(
               'Cerrar',
               style: TextStyle(
-                color: Color(0xFF6C5CE7),
+                color: isFakeUser ? Color(0xFF00B894) : Color(0xFF6C5CE7),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -499,7 +569,7 @@ class _UserProfileBottomSheet extends StatelessWidget {
             ),
             child: Icon(
               icon,
-              color: Color(0xFF6C5CE7),
+              color: isFakeUser ? Color(0xFF00B894) : Color(0xFF6C5CE7),
               size: 20,
             ),
           ),

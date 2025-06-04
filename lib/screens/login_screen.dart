@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:product_list_app/models/user.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
+import 'register_screen.dart'; // Importar la pantalla de registro
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -15,7 +17,6 @@ class _LoginScreenState extends State<LoginScreen> {
   
   bool _isLoading = false;
   bool _isPasswordVisible = false;
-  bool _isLoginMode = true; // true = Login, false = Register
 
   @override
   void dispose() {
@@ -25,56 +26,72 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // Función para login con email y contraseña
-  Future<void> _signInWithEmailPassword() async {
-    if (!_formKey.currentState!.validate()) return;
+Future<void> _signInWithUsernamePassword() async {
+  if (!_formKey.currentState!.validate()) return;
+  
+  setState(() => _isLoading = true);
 
-    setState(() => _isLoading = true);
-
-    try {
-      final user = _isLoginMode 
-        ? await _authService.signInWithEmailPassword(
-            _emailController.text.trim(),
-            _passwordController.text
-          )
-        : await _authService.signUpWithEmailPassword(
-            _emailController.text.trim(),
-            _passwordController.text
-          );
-
-      if (user != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => HomeScreen(user: user)),
-        );
-      } else {
-        _showErrorDialog(_isLoginMode ? 'Error al iniciar sesión' : 'Error al registrarse');
-      }
-    } catch (e) {
-      _showErrorDialog(e.toString());
-    } finally {
-      setState(() => _isLoading = false);
+  try {
+    final token = await _authService.loginUser(
+      username: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+    
+    if (token != null) {
+      // Pasar usuario fake con parámetros adicionales
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(
+            user: null, // Usuario Firebase es null
+            username: _emailController.text.trim(),
+            email: '${_emailController.text.trim()}@gmail.com',
+          ),
+        ),
+      );
+    } else {
+      _showErrorDialog('Credenciales incorrectas. Verifica tu usuario y contraseña.');
     }
+  } catch (e) {
+    _showErrorDialog(e.toString().replaceAll('Exception: ', ''));
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
 
-  // Función para login con Google
-  Future<void> _signInWithGoogle() async {
-    setState(() => _isLoading = true);
+// Función para login con Google (sin cambios)
+Future<void> _signInWithGoogle() async {
+  setState(() => _isLoading = true);
 
-    try {
-      final user = await _authService.signInWithGoogle();
-      if (user != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => HomeScreen(user: user)),
-        );
-      } else {
-        _showErrorDialog('Error al iniciar sesión con Google');
-      }
-    } catch (e) {
-      _showErrorDialog(e.toString());
-    } finally {
-      setState(() => _isLoading = false);
+  try {
+    final user = await _authService.signInWithGoogle();
+    if (user != null) {
+      // Pasar usuario de Firebase
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(
+            user: user, // Usuario Firebase
+            // username y email se toman del user de Firebase
+          ),
+        ),
+      );
+    } else {
+      _showErrorDialog('Error al iniciar sesión con Google');
     }
+  } catch (e) {
+    _showErrorDialog(e.toString());
+  } finally {
+    setState(() => _isLoading = false);
+  }
+}
+
+  // Navegar a la pantalla de registro
+  void _navigateToRegister() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => RegisterScreen()),
+    );
   }
 
   // Mostrar dialog de error
@@ -124,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 8),
               Text(
-                _isLoginMode ? 'Inicia sesión en tu cuenta' : 'Crea tu cuenta',
+                'Inicia sesión en tu cuenta',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
@@ -142,23 +159,23 @@ class _LoginScreenState extends State<LoginScreen> {
                     key: _formKey,
                     child: Column(
                       children: [
-                        // Campo de email
+                        // Campo de usuario
                         TextFormField(
                           controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
+                          keyboardType: TextInputType.text,
                           decoration: InputDecoration(
-                            labelText: 'Correo electrónico',
-                            prefixIcon: Icon(Icons.email),
+                            labelText: 'Usuario',
+                            prefixIcon: Icon(Icons.person),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Por favor ingresa tu email';
+                              return 'Por favor ingresa tu usuario';
                             }
-                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-                              return 'Por favor ingresa un email válido';
+                            if (value.length < 3) {
+                              return 'El usuario debe tener al menos 3 caracteres';
                             }
                             return null;
                           },
@@ -200,12 +217,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         SizedBox(height: 24),
 
-                        // Botón de login/registro
+                        // Botón de login
                         SizedBox(
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _signInWithEmailPassword,
+                            onPressed: _isLoading ? null : _signInWithUsernamePassword,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.blue,
                               foregroundColor: Colors.white,
@@ -216,7 +233,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: _isLoading
                               ? CircularProgressIndicator(color: Colors.white)
                               : Text(
-                                  _isLoginMode ? 'Iniciar Sesión' : 'Registrarse',
+                                  'Iniciar Sesión',
                                   style: TextStyle(fontSize: 16),
                                 ),
                           ),
@@ -262,26 +279,18 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 20),
 
-              // Cambiar entre login y registro
+              // Navegar a registro
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _isLoginMode 
-                      ? '¿No tienes cuenta? ' 
-                      : '¿Ya tienes cuenta? ',
+                    '¿No tienes cuenta? ',
                     style: TextStyle(color: Colors.grey[600]),
                   ),
                   TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _isLoginMode = !_isLoginMode;
-                        _emailController.clear();
-                        _passwordController.clear();
-                      });
-                    },
+                    onPressed: _navigateToRegister,
                     child: Text(
-                      _isLoginMode ? 'Regístrate' : 'Inicia sesión',
+                      'Regístrate',
                       style: TextStyle(
                         color: Colors.blue,
                         fontWeight: FontWeight.bold,
