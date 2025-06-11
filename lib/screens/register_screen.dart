@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/register_service.dart';
-import '../models/user.dart'; // Importar el modelo User
+import '../models/user.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -29,85 +30,180 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  // Función para registrar usuario usando el modelo User
+  // Función para guardar el token JWT
+  Future<void> _saveToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
+      await prefs.setString('login_time', DateTime.now().toIso8601String());
+      print('Token guardado exitosamente');
+    } catch (e) {
+      print('Error guardando token: $e');
+    }
+  }
+
+  // Función para obtener token guardado
+  Future<String?> _getStoredToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('auth_token');
+    } catch (e) {
+      print('Error obteniendo token: $e');
+      return null;
+    }
+  }
+
+  // Función para registrar usuario 
   Future<void> _registerUser() async {
     if (!_formKey.currentState!.validate()) return;
-
+    
     setState(() => _isLoading = true);
-
+    
     try {
-      // Validar si el email ya existe
-      final emailTaken = await _registerService.isEmailTaken(_emailController.text.trim());
-      if (emailTaken) {
-        _showErrorDialog('Este email ya está registrado');
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // Validar si el username ya existe
-      final usernameTaken = await _registerService.isUsernameTaken(_usernameController.text.trim());
-      if (usernameTaken) {
-        _showErrorDialog('Este nombre de usuario ya está en uso');
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // Registrar usuario y obtener objeto User
-      final User? newUser = await _registerService.registerUser(
+      // Usar el método con validaciones 
+      final result = await _registerService.registerUserWithErrorHandling(
         username: _usernameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-
-      if (newUser != null) {
-        _showSuccessDialog(newUser);
+      
+      if (result != null) {
+        // Extraer datos del resultado
+        final String token = result['token'];
+        final Map<String, dynamic> userData = result['user'];
+        
+        // Crear objeto User a partir de los datos recibidos
+        final User newUser = User.fromJson(userData);
+        await _saveToken(token);
+        _showSuccessDialog(newUser, token);
       } else {
         _showErrorDialog('Error al crear la cuenta. Inténtalo de nuevo.');
       }
     } catch (e) {
-      _showErrorDialog('Error: ${e.toString()}');
+      String errorMessage = e.toString().replaceAll('Exception: ', '');
+      if (errorMessage.contains('El username ya está en uso')) {
+        errorMessage = 'Este nombre de usuario ya está en uso';
+      } else if (errorMessage.contains('El email ya está registrado')) {
+        errorMessage = 'Este email ya está registrado';
+      } else if (errorMessage.contains('connection') || errorMessage.contains('SocketException')) {
+        errorMessage = 'Error de conexión. Verifica tu conexión a internet y que el servidor esté funcionando.';
+      } else if (errorMessage.contains('Username debe tener entre')) {
+        errorMessage = 'El nombre de usuario debe tener entre 3 y 20 caracteres y solo contener letras, números y guiones bajos';
+      }
+      
+      _showErrorDialog(errorMessage);
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  // Mostrar dialog de error
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Error'),
+        title: Row(
+          children: [
+            Icon(Icons.error, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Error'),
+          ],
+        ),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('OK'),
+            child: Text('OK', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
   }
 
-  // Mostrar dialog de éxito con información del usuario creado
-  void _showSuccessDialog(User user) {
+  void _showSuccessDialog(User user, String token) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Text('¡Registro exitoso!'),
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('¡Registro exitoso!'),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Tu cuenta ha sido creada correctamente:'),
-            SizedBox(height: 10),
-            Text('ID: ${user.id}', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('Nombre: ${user.name}', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text('Email: ${user.email}', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-            Text('Ahora puedes iniciar sesión con tus credenciales.'),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.person, size: 16, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('Usuario: ${user.username}', 
+                           style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.email, size: 16, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text('Email: ${user.email}', 
+                                   style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.badge, size: 16, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text('ID: ${user.id}', 
+                           style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(Icons.info, size: 16, color: Colors.green),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Has sido autenticado automáticamente. ¡Bienvenido!',
+                             style: TextStyle(color: Colors.green[700])),
+                ),
+              ],
+            ),
           ],
         ),
         actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              // Navegar a la pantalla principal (home) ya que el usuario está autenticado
+              Navigator.pushReplacementNamed(context, '/home');
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text('Continuar a la App'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop();
@@ -116,11 +212,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 MaterialPageRoute(builder: (_) => LoginScreen()),
               );
             },
-            child: Text('Ir al Login'),
+            child: Text('Ir al Login', style: TextStyle(color: Colors.grey[600])),
           ),
         ],
       ),
     );
+  }
+
+  // Función para testear la conexión a la API
+  Future<void> _testConnection() async {
+    try {
+      final isConnected = await _registerService.testDatabaseConnection();
+      final apiInfo = await _registerService.getApiInfo();
+      
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Estado de la Conexión'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isConnected ? Icons.check_circle : Icons.error,
+                    color: isConnected ? Colors.green : Colors.red,
+                  ),
+                  SizedBox(width: 8),
+                  Text(isConnected ? 'Conectado' : 'Sin conexión'),
+                ],
+              ),
+              if (apiInfo != null) ...[
+                SizedBox(height: 16),
+                Text('API disponible:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('• ${apiInfo['endpoints']['register']}'),
+                Text('• ${apiInfo['endpoints']['login']}'),
+                Text('• ${apiInfo['endpoints']['profile']}'),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _showErrorDialog('Error probando conexión: ${e.toString()}');
+    }
   }
 
   @override
@@ -139,6 +281,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: TextStyle(color: Colors.grey[800]),
         ),
         centerTitle: true,
+        actions: [
+          // Botón para testear conexión (solo en desarrollo)
+          IconButton(
+            icon: Icon(Icons.wifi, color: Colors.grey[600]),
+            onPressed: _testConnection,
+            tooltip: 'Probar conexión',
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -149,10 +299,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
               SizedBox(height: 20),
               
               // Logo o título
-              Icon(
-                Icons.person_add,
-                size: 80,
-                color: Colors.blue,
+              Container(
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.person_add,
+                  size: 60,
+                  color: Colors.blue,
+                ),
               ),
               SizedBox(height: 16),
               Text(
@@ -178,6 +335,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               // Formulario de registro
               Card(
                 elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Padding(
                   padding: EdgeInsets.all(20),
                   child: Form(
@@ -193,14 +353,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            helperText: 'Este será tu nombre mostrado en la app',
+                            helperText: '3-20 caracteres: letras, números y _',
+                            helperMaxLines: 2,
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Por favor ingresa un nombre de usuario';
                             }
-                            if (value.length < 3) {
-                              return 'El nombre de usuario debe tener al menos 3 caracteres';
+                            if (!_registerService.isValidUsername(value)) {
+                              return 'Username debe tener entre 3-20 caracteres: letras, números y _';
                             }
                             return null;
                           },
@@ -222,7 +383,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Por favor ingresa tu email';
                             }
-                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+                            if (!_registerService.isValidEmail(value)) {
                               return 'Por favor ingresa un email válido';
                             }
                             return null;
@@ -252,12 +413,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            helperText: 'Mínimo 6 caracteres',
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Por favor ingresa una contraseña';
                             }
-                            if (value.length < 6) {
+                            if (!_registerService.isValidPassword(value)) {
                               return 'La contraseña debe tener al menos 6 caracteres';
                             }
                             return null;
@@ -312,12 +474,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
+                              elevation: 3,
                             ),
                             child: _isLoading
-                              ? CircularProgressIndicator(color: Colors.white)
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text('Creando cuenta...'),
+                                  ],
+                                )
                               : Text(
                                   'Crear Cuenta',
-                                  style: TextStyle(fontSize: 16),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                           ),
                         ),
@@ -353,6 +533,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ],
               ),
+              
+              // Información adicional para desarrollo
+              if (const bool.fromEnvironment('dart.vm.product') == false) ...[
+                SizedBox(height: 20),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info, color: Colors.orange, size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            'Modo Desarrollo',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Usa el ícono WiFi para probar la conexión con tu API',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),

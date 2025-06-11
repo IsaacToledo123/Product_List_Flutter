@@ -8,9 +8,9 @@ import 'cart_screen.dart';
 import '../models/navItem.dart';
 
 class HomeScreen extends StatefulWidget {
-  final User? user; // Ahora es opcional
-  final String? username; // Para usuarios fake
-  final String? email; // Para usuarios fake
+  final User? user; 
+  final String? username;
+  final String? email; 
 
   HomeScreen({
     this.user, 
@@ -160,6 +160,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         user: widget.user,
         username: widget.username,
         email: widget.email,
+        onLogout: _handleSignOut, // Pasar el método de logout
       ),
     );
   }
@@ -413,11 +414,13 @@ class _UserProfileBottomSheet extends StatelessWidget {
   final User? user;
   final String? username;
   final String? email;
+  final VoidCallback? onLogout; // Agregamos callback para logout
 
   _UserProfileBottomSheet({
     this.user,
     this.username,
     this.email,
+    this.onLogout, // Nuevo parámetro
   });
 
   bool get isFakeUser => user == null;
@@ -525,7 +528,41 @@ class _UserProfileBottomSheet extends StatelessWidget {
               title: 'Nombre',
               subtitle: user!.displayName!,
             ),
-          SizedBox(height: 20),
+          SizedBox(height: 24),
+          
+          // BOTÓN DE CERRAR SESIÓN
+          Container(
+            margin: EdgeInsets.symmetric(horizontal: 20),
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context); // Cerrar el modal primero
+                if (onLogout != null) {
+                  onLogout!(); // Ejecutar el callback de logout
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFFF6B6B),
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+                shadowColor: Color(0xFFFF6B6B).withOpacity(0.3),
+              ),
+              icon: Icon(Icons.logout, size: 20),
+              label: Text(
+                'Cerrar Sesión',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+          
+          SizedBox(height: 16),
           TextButton(
             onPressed: () => Navigator.pop(context),
             style: TextButton.styleFrom(

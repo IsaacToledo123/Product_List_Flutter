@@ -1,30 +1,54 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+// test/widget_test.dart - Los tests más básicos posibles
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:product_list_app/main.dart';
+import 'package:product_list_app/screens/login_screen.dart';
+import 'package:product_list_app/screens/register_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('LoginScreen se construye', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(home: LoginScreen()));
+    expect(find.byType(LoginScreen), findsOneWidget);
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  // Test 2: RegisterScreen se puede crear
+  testWidgets('RegisterScreen se construye', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(home: RegisterScreen()));
+    expect(find.byType(RegisterScreen), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  // Test 3: LoginScreen tiene texto
+  testWidgets('LoginScreen tiene título', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(home: LoginScreen()));
+    expect(find.text('Product List App'), findsOneWidget);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  // Test 4: RegisterScreen tiene texto
+  testWidgets('RegisterScreen tiene título', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(home: RegisterScreen()));
+    expect(find.text('Crear Cuenta'), findsOneWidget);
+  });
+
+  // Test 5: LoginScreen tiene campos de texto
+  testWidgets('LoginScreen tiene campos', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(home: LoginScreen()));
+    expect(find.byType(TextFormField), findsWidgets);
+  });
+
+  // Test 6: RegisterScreen tiene campos de texto
+  testWidgets('RegisterScreen tiene campos', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(home: RegisterScreen()));
+    expect(find.byType(TextFormField), findsWidgets);
+  });
+
+  // Test 7: LoginScreen tiene botón
+  testWidgets('LoginScreen tiene botón', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(home: LoginScreen()));
+    expect(find.text('Iniciar Sesión'), findsOneWidget);
+  });
+
+  // Test 8: RegisterScreen tiene botón
+  testWidgets('RegisterScreen tiene botón', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(home: RegisterScreen()));
+    expect(find.text('Crear Cuenta'), findsOneWidget);
   });
 }
